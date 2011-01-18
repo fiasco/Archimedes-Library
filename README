@@ -1,0 +1,6 @@
+These is a repository of archimedes client libraries for different
+languages. You will most likely need to obtain this library to enable
+archimedes client to report your application to an archimedes server.
+
+For application specific usage, see your application's implementation
+of the archimedes client.
