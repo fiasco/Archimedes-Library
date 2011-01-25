@@ -407,3 +407,33 @@ class ArchimedesRemoteRequest {
   }
 
 }
+
+function archimedes_directory_hash($dir, $ignore) {
+  if (!is_dir($dir)) {
+    return false;
+  }
+
+  $filemd5s = array();
+  $d = dir($dir);
+
+  while (($entry = $d->read()) !== false)  {
+    if ($entry != '.' && $entry != '..')  {
+      foreach($ignore as $pattern)  {
+        if(preg_match($pattern, $dir . '/' . $entry)) {
+          return false;
+        }
+      }
+      if (is_dir($dir . '/' . $entry))  {
+        $filemd5s[] = archimedes_directory_hash($dir . '/' . $entry, $ignore);
+      }
+      else  {
+        $filemd5s[] = md5_file($dir . '/' . $entry);
+      }
+    }
+  }
+
+  $d->close();
+  //sort the md5s before concat so ensure order of files doesn't affect it.
+  asort($filemd5s);
+  return md5(implode('', $filemd5s));
+}
