@@ -155,7 +155,6 @@ class Archimedes {
     // Parse response.
     list($split, $result) = explode("\r\n\r\n", $response, 2);
     $split = preg_split("/\r\n|\n|\r/", $split);
-    print $result;die;
 
     list($protocol, $code, $text) = explode(' ', trim(array_shift($split)), 3);
 
@@ -177,7 +176,8 @@ class Archimedes {
       default:
         return FALSE;
     }
-    return TRUE;
+    $status = json_decode($result);
+    return $status->success;
   }
 
   /**
