@@ -53,41 +53,155 @@ class Archimedes {
     return TRUE;
   }
 
+  public function encrypt($key) {
+    $data = $this->toXML();
+    $pubkey = openssl_pkey_get_public($key);
+    openssl_seal($data,$sealed,$ekeys,array($pubkey));
+    openssl_free_key($pubkey);
+    $this->encrypted = $sealed;
+    $this->ekey = $ekeys[0];
+    return $this;
+  }
+
+  /**
+   * Encrypt the data.
+   */
+  protected function getEncrypted() {
+    if (!$this->encrypted) {
+      throw new Exception("Can not retrive encrypted data. Data has not yet been encrypted.");
+    }
+    return $this->encrypted;
+  }
+
+  public function __toString() {
+    return base64_encode($this->getEncrypted());
+  } 
+
+  /**
+   * Post the data directly to the Archimedes Server.
+   */
+  public function postXML($server_url) {
+    // Parse the URL and make sure we can handle the schema.
+    $uri = parse_url($server_url);
+
+    if ($uri == FALSE) {
+      throw new Exception('Unable to parse URL.');
+    }
+
+    if (!isset($uri['scheme'])) {
+      throw new Exception('Missing URL schema for: ['. $uri . ']' );
+    }
+
+    switch ($uri['scheme']) {
+      case 'http':
+        $port = isset($uri['port']) ? $uri['port'] : 80;
+        $host = $uri['host'] . ($port != 80 ? ':'. $port : '');
+        $fp = @fsockopen($uri['host'], $port, $errno, $errstr, 15);
+        break;
+      case 'https':
+        // Note: Only works for PHP 4.3 compiled with OpenSSL.
+        $port = isset($uri['port']) ? $uri['port'] : 443;
+        $host = $uri['host'] . ($port != 443 ? ':'. $port : '');
+        $fp = @fsockopen('ssl://'. $uri['host'], $port, $errno, $errstr, 20);
+        break;
+      default:
+        throw new Exception('Invalid schema '. $uri['scheme'] . '.');
+    }
+
+    // Make sure the socket opened properly.
+    if (!$fp) {
+      throw new Exception(trim($errstr));
+    }
+
+    // Construct the path to act on.
+    $path = isset($uri['path']) ? $uri['path'] : '/';
+    if (isset($uri['query'])) {
+      $path .= '?'. $uri['query'];
+    }
+
+    $content['data'] = (string) $this;
+    $content['key'] = base64_encode($this->ekey);
+    $content = json_encode($content);
+
+    // Create HTTP request.
+    $defaults = array(
+      // RFC 2616: "non-standard ports MUST, default ports MAY be included".
+      // We don't add the port to prevent from breaking rewrite rules checking the
+      // host that do not take into account the port number.
+      'Host' => "Host: $host",
+      'User-Agent' => 'User-Agent: (Archimedes Client)',
+    );
+
+    $defaults['Content-Length'] = 'Content-Length: '. strlen($content);
+
+    // If the server url has a user then attempt to use basic authentication
+    if (isset($uri['user'])) {
+      $defaults['Authorization'] = 'Authorization: Basic '. base64_encode($uri['user'] . (!empty($uri['pass']) ? ":". $uri['pass'] : ''));
+    }
+
+    $request = 'POST '. $path ." HTTP/1.0\r\n";
+    $request .= implode("\r\n", $defaults);
+    $request .= "\r\n\r\n";
+    $request .= $content;
+    fwrite($fp, $request);
+
+    // Fetch response.
+    $response = '';
+    while (!feof($fp) && $chunk = fread($fp, 1024)) {
+      $response .= $chunk;
+    }
+    fclose($fp);
+
+    // Parse response.
+    list($split, $result) = explode("\r\n\r\n", $response, 2);
+    $split = preg_split("/\r\n|\n|\r/", $split);
+    print $result;die;
+
+    list($protocol, $code, $text) = explode(' ', trim(array_shift($split)), 3);
+
+    // Parse headers.
+    while ($line = trim(array_shift($split))) {
+      list($header, $value) = explode(':', $line, 2);
+      $headers[$header] = trim($value);
+    }
+
+    $code = floor($code / 100) * 100;
+
+    switch ($code) {
+      case 200: // OK
+      case 304: // Not modified
+      case 301: // Moved permanently
+      case 302: // Moved temporarily
+      case 307: // Moved temporarily
+        break;
+      default:
+        return FALSE;
+    }
+    return TRUE;
+  }
+
   /**
    * Send the XML report via email.
    */
-  public function sendXML($email, $site_name, $key) {
-    $boundary = '-----=' . md5(uniqid(rand()));
-    $attachment = $this->toXML();
+  public function sendXML($email) {
+    if ($key == '') { // encrypt xml attachment and send environment keys
+      return FALSE;
+    }
+    $attachment = chunk_split((string) $this); 
 
-    $headers = 'From: ' . $site_name . ' <' . $this->author . '>' . "\r\n";
+    $boundary = '-----=' . md5(uniqid(rand()));
+    $headers = 'From: ' . (string) $this->getField('title') . ' <' . $this->author . '>' . "\r\n";
     $headers .= 'Content-Type: multipart/mixed; boundary="' . $boundary . '"' . "\r\n";
     $headers .= 'Mime-Version: 1.0' . "\r\n";
     $message = '--' . $boundary . "\r\n";
     $message .= "Content-Type: text/plain\r\n";
     $message .= "Content-Transfer-Encoding: 7bit\r\n\r\n";
-
     $message .= "Archimedes XML update attached.\r\n";
-
     $message .= '--' . $boundary . "\r\n";
-
-    if ($key != '') { // encrypt xml attachment and send environment keys
-      $pubkey = openssl_pkey_get_public($key);
-      openssl_seal($attachment,$sealed,$ekeys,array($pubkey));
-      openssl_free_key($pubkey);
-
-      $attachment = $sealed;
-
-      $message .= "Content-Type: text/plain\r\n";
-      $message .= "Content-Transfer-Encoding: base64\r\n\r\n";
-
-      $message .= chunk_split(base64_encode("EKEY: " . $ekeys[0]));
-
-      $message .= '--' . $boundary . "\r\n";
-
-    }
-
-    $attachment = chunk_split(base64_encode($attachment));
+    $message .= "Content-Type: text/plain\r\n";
+    $message .= "Content-Transfer-Encoding: base64\r\n\r\n";
+    $message .= chunk_split(base64_encode("EKEY: " . $this->ekey));
+    $message .= '--' . $boundary . "\r\n";
 
     $message .= 'Content-Type: application/xml; name="data.xml"' . "\r\n";
     $message .= 'Content-Transfer-Encoding: base64' . "\r\n";
