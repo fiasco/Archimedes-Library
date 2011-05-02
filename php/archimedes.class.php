@@ -432,11 +432,25 @@ Class Archimedes_gitrepo extends ANSValue {
     parent::__construct($value);
   }
   public function setRemoteName($name) {
-    $this->setAttributeNS('monitor-plugin:git','git:remote', $name);
+    $this->setAttributeNS($this->ns,'git:remote', $name);
     return $this;
   }
   public function toArray() {
     return array('remote' => $this->getAttributeNS('git:remote'),'uri' => (string) $this->value);
+  }
+}
+
+Class Archimedes_dataset extends ANSValue {
+  public function __construct($value) {
+    $this->ns = 'monitor-plugin:dataset';
+    parent::__construct($value);
+  }
+  public function setTitle($title) {
+    $this->setAttributeNS($this->ns, 'dataset:title', $title);
+    return $this;
+  }
+  public function toArray() {
+    return array('title' => $this->getAttributeNS('dataset:title'),'value' => (string) $this->value);
   }
 }
 
