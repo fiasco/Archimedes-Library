@@ -184,10 +184,7 @@ class Archimedes {
    * Send the XML report via email.
    */
   public function sendXML($email) {
-    if ($key == '') { // encrypt xml attachment and send environment keys
-      return FALSE;
-    }
-    $attachment = chunk_split((string) $this); 
+    $attachment = chunk_split((string) $this);
 
     $boundary = '-----=' . md5(uniqid(rand()));
     $headers = 'From: ' . (string) $this->getField('title') . ' <' . $this->author . '>' . "\r\n";
@@ -208,7 +205,6 @@ class Archimedes {
     $message .= 'Content-Disposition: attachment; filename="data.xml"' . "\r\n\r\n";
     $message .= $attachment . "\r\n";
     $message .= '--' . $boundary . "\r\n";
-
 
     return mail($email, 'XML Update from' . ' ' . $site_name, $message, $headers);
   }
