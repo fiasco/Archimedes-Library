@@ -533,6 +533,10 @@ class ArchimedesRemoteRequest {
 }
 
 function archimedes_directory_hash($dir, $ignore) {
+  // Symlink count is important. While we don't want to follow
+  // symlinks, we need to know they are there incase they are
+  // introduced or removed.
+  $symlinks = array();
   if (!is_dir($dir)) {
     return false;
   }
@@ -541,23 +545,42 @@ function archimedes_directory_hash($dir, $ignore) {
   $d = dir($dir);
 
   while (($entry = $d->read()) !== false)  {
-    if ($entry != '.' && $entry != '..')  {
-      foreach($ignore as $pattern)  {
-        if(preg_match($pattern, $dir . '/' . $entry)) {
-          return false;
-        }
+    if (in_array($entry, array('.', '..'))) {
+      continue;
+    }
+    $path = realpath($dir . '/' . $entry);
+    // If the begining of the path does not match exactly then
+    // this directory does not lead deeper but to somewhere else which
+    // may create a recursive loop.
+    if (strpos($path, $dir) !== 0) {
+      $symlinks[] = $path;
+      continue;
+    }
+    // Symlinks may introduce recursive loops.
+    if (is_link($path)) {
+      $symlinks[] = $path;
+      continue;
+    }
+    $ignore_entry = FALSE;
+    foreach($ignore as $pattern)  {
+      if(preg_match($pattern, $path)) {
+        $ignore_entry = TRUE;
+        break;
       }
-      if (is_dir($dir . '/' . $entry))  {
-        $filemd5s[] = archimedes_directory_hash($dir . '/' . $entry, $ignore);
-      }
-      else  {
-        $filemd5s[] = md5_file($dir . '/' . $entry);
-      }
+    }
+    if ($ignore_entry) {
+      continue;
+    }
+    if (is_dir($path))  {
+      $filemd5s[] = archimedes_directory_hash($path, $ignore);
+    }
+    elseif (is_file($path)) {
+      $filemd5s[] = md5_file($path);
     }
   }
 
   $d->close();
   //sort the md5s before concat so ensure order of files doesn't affect it.
   asort($filemd5s);
-  return md5(implode('', $filemd5s));
+  return md5(implode('', $filemd5s) . implode('', $symlinks));
 }
