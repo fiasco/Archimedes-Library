@@ -317,7 +317,7 @@ Class ANSValue extends DOMElement {
   public $facet = FALSE;
 
   public function __construct($val) {
-    parent::__construct('value', $val);
+    parent::__construct('value', htmlspecialchars($val));
     $this->value = $val;
   }
 
