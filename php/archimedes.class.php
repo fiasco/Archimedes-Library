@@ -280,7 +280,7 @@ Class ArchimedesField {
       $value->compile($field);
       if ($this->facet) {
         $value->nodeValue = '';
-        $value->appendChild(new DOMElement('facet', (string) $value));
+        $value->appendChild(new DOMElement('facet', htmlspecialchars((string) $value)));
       }
     }
     return $field;
