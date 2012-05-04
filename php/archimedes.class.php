@@ -563,7 +563,7 @@ function archimedes_directory_hash($dir, $ignore) {
       }
       $ignore_entry = FALSE;
       foreach($ignore as $pattern)  {
-        if(preg_match($pattern, $path)) {
+        if(preg_match($pattern, $path) || !is_readable($path)) {
           $ignore_entry = TRUE;
           break;
         }
