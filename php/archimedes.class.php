@@ -75,7 +75,7 @@ class Archimedes {
 
   public function __toString() {
     return base64_encode($this->getEncrypted());
-  } 
+  }
 
   /**
    * Post the data directly to the Archimedes Server.
@@ -174,7 +174,7 @@ class Archimedes {
       case 307: // Moved temporarily
         break;
       default:
-        return FALSE;
+        throw new Exception('Unable to submit data. Archimedes server returned HTTP code ' . $code . ', ' . $text);
     }
     $status = json_decode($result);
     return $status->success;
@@ -584,7 +584,7 @@ function archimedes_directory_hash($dir, $ignore) {
     asort($filemd5s);
     return md5(implode('', $filemd5s) . implode('', $symlinks));
   }
-  else { 
+  else {
     /**
      * return an error usefully - if we weren't in an external library
      * then this would be a watchdog() statement
