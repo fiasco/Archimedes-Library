@@ -75,7 +75,7 @@ class Archimedes {
 
   public function __toString() {
     return base64_encode($this->getEncrypted());
-  } 
+  }
 
   /**
    * Post the data directly to the Archimedes Server.
@@ -338,7 +338,7 @@ Class ANSValue extends DOMElement {
     return $this->attr[$name];
   }
 
-  public function getAttributeNS($name) {
+  public function getAttributeNS($name, $local_name) {
     return $this->ns_attr[$name];
   }
 
