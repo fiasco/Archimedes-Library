@@ -185,9 +185,10 @@ class Archimedes {
    */
   public function sendXML($email) {
     $attachment = chunk_split((string) $this);
+    $site_name = (string) $this->getField('title');
 
     $boundary = '-----=' . md5(uniqid(rand()));
-    $headers = 'From: ' . (string) $this->getField('title') . ' <' . $this->author . '>' . "\r\n";
+    $headers = 'From: ' . $site_name . ' <' . $this->author . '>' . "\r\n";
     $headers .= 'Content-Type: multipart/mixed; boundary="' . $boundary . '"' . "\r\n";
     $headers .= 'Mime-Version: 1.0' . "\r\n";
     $message = '--' . $boundary . "\r\n";
