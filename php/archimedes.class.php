@@ -174,7 +174,7 @@ class Archimedes {
       case 307: // Moved temporarily
         break;
       default:
-        return FALSE;
+        throw new Exception('Unable to submit data. Archimedes server returned HTTP code ' . $code . ', ' . $text);
     }
     $status = json_decode($result);
     return $status->success;
@@ -543,45 +543,52 @@ function archimedes_directory_hash($dir, $ignore) {
   }
 
   $filemd5s = array();
-  $d = dir($dir);
 
-  while (($entry = $d->read()) !== false)  {
-    if (in_array($entry, array('.', '..'))) {
-      continue;
-    }
-    $path = realpath($dir . '/' . $entry);
-    // If the begining of the path does not match exactly then
-    // this directory does not lead deeper but to somewhere else which
-    // may create a recursive loop.
-    if (strpos($path, $dir) !== 0) {
-      $symlinks[] = $path;
-      continue;
-    }
-    // Symlinks may introduce recursive loops.
-    if (is_link($path)) {
-      $symlinks[] = $path;
-      continue;
-    }
-    $ignore_entry = FALSE;
-    foreach($ignore as $pattern)  {
-      if(preg_match($pattern, $path)) {
-        $ignore_entry = TRUE;
-        break;
+  if ($d = dir($dir)) {
+    while (($entry = $d->read()) !== false)  {
+      if (in_array($entry, array('.', '..'))) {
+        continue;
+      }
+      $path = realpath($dir . '/' . $entry);
+      // If the begining of the path does not match exactly then
+      // this directory does not lead deeper but to somewhere else which
+      // may create a recursive loop.
+      if (strpos($path, $dir) !== 0) {
+        $symlinks[] = $path;
+        continue;
+      }
+      // Symlinks may introduce recursive loops.
+      if (is_link($path)) {
+        $symlinks[] = $path;
+        continue;
+      }
+      $ignore_entry = FALSE;
+      foreach($ignore as $pattern)  {
+        if(preg_match($pattern, $path) || !is_readable($path)) {
+          $ignore_entry = TRUE;
+          break;
+        }
+      }
+      if ($ignore_entry) {
+        continue;
+      }
+      if (is_dir($path))  {
+        $filemd5s[] = archimedes_directory_hash($path, $ignore);
+      }
+      elseif (is_file($path)) {
+        $filemd5s[] = md5_file($path);
       }
     }
-    if ($ignore_entry) {
-      continue;
-    }
-    if (is_dir($path))  {
-      $filemd5s[] = archimedes_directory_hash($path, $ignore);
-    }
-    elseif (is_file($path)) {
-      $filemd5s[] = md5_file($path);
-    }
-  }
 
-  $d->close();
-  //sort the md5s before concat so ensure order of files doesn't affect it.
-  asort($filemd5s);
-  return md5(implode('', $filemd5s) . implode('', $symlinks));
+    $d->close();
+    //sort the md5s before concat so ensure order of files doesn't affect it.
+    asort($filemd5s);
+    return md5(implode('', $filemd5s) . implode('', $symlinks));
+  }
+  else {
+    /**
+     * return an error usefully - if we weren't in an external library
+     * then this would be a watchdog() statement
+     */
+  }
 }
